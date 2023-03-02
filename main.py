@@ -1,34 +1,74 @@
-import json
 import requests
 from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
 
-# Get price of Banano/Nano pair from banano.nano.trade: (Other pairs are available on nano.trade.)
-url='https://banano.nano.trade/api'
-getPrice=requests.get(url).json()
-print('Price API returns the following JSON: ' + str(getPrice))
-print('As an example, get prices (user-buy, user-sell): ' + str(getPrice['user_buy_price']), str(getPrice['user_sell_price']))
+# select method
+async def select():
+    options = ['Buy Banano', 'Sell Banano']
+    user_input = ''
+    input_message = "Pick an option:\n"
+    for index, item in enumerate(options):
+        input_message += f'{index+1}) {item}\n'
+    input_message += 'Your choice: '
+    while user_input not in map(str, range(1, len(options) + 1)):
+        user_input = input(input_message)
+    print(f'You picked: {options[int(user_input) - 1]}')
+    getPrice=requests.get('https://banano.nano.trade/api').json()
 
-# We will buy Banano by sending Nano. Therefore, we'll provide a Banano address to receive Banano, and a Nano refund address. Then we'll get a Nano deposit address to make a deposit.
-headers = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2919.83 Safari/537.36'}
-url='https://banano.nano.trade/buy' # /buy is to buy Banano (coin) by selling Nano (main). /sell is to sell Banano to receive Nano. Other pairs are available on nano.trade.
 
-MyBananoAddress='' # Enter your Banano address to receive Banano. 
-MyNanoRefundAddress='' # Enter your Nano refund address, that will be used to send a refund when something goes wrong with the transaction (e.g. sending more than the maximum amount).
-# This refund address is linked to the given address of the user (MyBananoAddress), it is permanently linked and cannot be changed later.
+    print('\nBuy Price 1 NANO:' + str(round(1/getPrice['user_buy_price'],2)) + ' BANANO - Max Buy: ' + str(getPrice['max_buy']) + ' NANO')
+    print('Sell Price: ' + str(round(1/getPrice['user_sell_price'],2)) + ' BANANO:1 NANO - Max Sell: ' + str(getPrice['max_sell']) + ' BANANO')
 
-data={'coin_address_block': MyBananoAddress, 'main_refund_address': MyNanoRefundAddress} # On /sell, the parameters are "address_block" and "coin_refund_address", respectively.
-x=requests.post(url, data=data, headers=headers)
-source = BeautifulSoup(x.content,"html.parser")
-deposit_address=source.find('input')['value']
+    # user defined list of single or multiple address
+    print('\nMultiple address supported, separated by space')
+    NanoAddressList = [str(XNO) for XNO in input("Enter receive/refund Nano address: ").split()]
+    print("List of XNO address: ", NanoAddressList)
+    BananoAddressList = [str(BAN) for BAN in input("Enter receive/refund Banano address: ").split()]
+    print("List of BAN address: ", BananoAddressList)
 
-print('Your deposit address: ' + deposit_address) # You can send the deposit to this address:
+    # sending the information to API to match with user options
+    if len(NanoAddressList) == len(BananoAddressList):
+        tasks = []
+        for i in range(len(NanoAddressList)):
+            Number = i+1
+            NanoAddress = NanoAddressList[i]
+            BananoAddress = BananoAddressList[i]
+            if int(user_input) == 1:
+                selection = 'buy'
+                data = {'coin_address_block': BananoAddress, 'main_refund_address': NanoAddress}
+                await api(NanoAddress, BananoAddress, Number, data, selection)
+            elif int(user_input) == 2:
+                selection = 'sell'
+                data = {'address_block': NanoAddress, 'coin_refund_address': BananoAddress}
+                await api(NanoAddress, BananoAddress, Number, data, selection)
+    else:
+        print('Error! Nano Address and Banano Address need to be in the same length!')
 
-print('Your refund address: ' + str(source.findAll('small')[3].text)[65:])
-
-# If you've sent a deposit within 60 minutes after requesting from either /buy or /sell, you don't need to do anything after sending deposits, your transaction will be processed within 2 minutes of your deposit.
-# If you don't want to wait 2 minutes, you can directly go to /buying/<address> & /selling/<address>, and see the result of the transation like this:
-url='https://banano.nano.trade/buying/' + MyBananoAddress # On /selling, enter your Nano address.
-x=requests.get(url, headers=headers)
-source = BeautifulSoup(x.content,"html.parser")
-result=deposit_address=source.findAll('p')[0].text
-print('Result: ' + result) # It should return the exchange rate if the transaction is successful. If not, it should return a "transfer has not arrived yet" message. It may also return a refund message if something goes wrong.
+# 
+async def api(NanoAddress, BananoAddress, Number, data, selection):
+    async with aiohttp.ClientSession() as session:
+        # use the session to make a POST request
+        async with session.post(f'https://banano.nano.trade/{selection}', data=data, headers={'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2919.83 Safari/537.36'}) as response:
+            content = await response.text()
+            source = BeautifulSoup(content, "html.parser")
+            deposit_address = source.find('input')['value']
+            print(f'\nNumber {Number}')
+            if selection == 'sell':
+                print('------------------------------------------------------------------------------------------------------')
+                print(f'Nano receive address: {NanoAddress}')
+                print(f'Banano refund address: {BananoAddress}')
+                print(f'DEPOSIT ADDRESS: {deposit_address}')
+                print('------------------------------------------------------------------------------------------------------')
+                print(f'Result: https://nanolooker.com/account/{NanoAddress}\n')
+            else:
+                print('------------------------------------------------------------------------------------------------------')
+                print(f'Banano receive address: {BananoAddress}')
+                print(f'Nano refund address: {NanoAddress}')
+                print(f'DEPOSIT ADDRESS: {deposit_address}')
+                print('------------------------------------------------------------------------------------------------------')
+                print(f'Result: https://bananolooker.com/account/{BananoAddress}\n')
+                
+# run the info function to send all of the requests
+loop = asyncio.get_event_loop()
+loop.run_until_complete(select())

@@ -17,7 +17,7 @@ async def select():
     getPrice=requests.get('https://banano.nano.trade/api').json()
 
 
-    print('\nBuy Price 1 NANO:' + str(round(1/getPrice['user_buy_price'],2)) + ' BANANO - Max Buy: ' + str(getPrice['max_buy']) + ' NANO')
+    print('\nBuy Price: 1 NANO:' + str(round(1/getPrice['user_buy_price'],2)) + ' BANANO - Max Buy: ' + str(getPrice['max_buy']) + ' NANO')
     print('Sell Price: ' + str(round(1/getPrice['user_sell_price'],2)) + ' BANANO:1 NANO - Max Sell: ' + str(getPrice['max_sell']) + ' BANANO')
 
     # user defined list of single or multiple address

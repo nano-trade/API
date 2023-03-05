@@ -101,5 +101,3 @@ async def api(NanoAddress, BananoAddress, Number, data, selection):
 # run the info function to send all of the requests
 loop = asyncio.get_event_loop()
 loop.run_until_complete(select())
-
-
